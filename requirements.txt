@@ -1,0 +1,15 @@
+openai
+ffmpeg-python
+python-dotenv
+
+git+https://github.com/openai/whisper.git
+setuptools-rust
+numpy<2
+whisper
+jiwer
+pandas
+matplotlib
+
+langchain
+langchain-ollama
+ollama
