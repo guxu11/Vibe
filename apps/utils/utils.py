@@ -29,7 +29,7 @@ def visualize_audio(audio_path):
 
 if __name__ == '__main__':
     input_path = "../data/video/demo.webm"
-    output_path = "../data/audio/demo.mp3"
+    output_path = "../../data/audio/demo.mp3"
 
     # extract_audio(input_path, output_path)
     write_output(input_path)
