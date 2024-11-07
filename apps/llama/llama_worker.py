@@ -3,10 +3,12 @@ from .. import PROJECT_BASE_PATH
 
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_ollama.llms import OllamaLLM
-from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import PyPDFLoader
 from langchain.schema import Document
+from langchain.chains.summarize import load_summarize_chain
+import textwrap
 
 class LlamaWorker:
     def __init__(self, model_name="llama3.2"):
@@ -18,7 +20,7 @@ class LlamaWorker:
         """
         self.model_name = model_name
         # Initialize the Ollama LLM
-        self.llm = OllamaLLM(model=self.model_name)
+        self.llm = OllamaLLM(model=self.model_name, num_threads=8, temperature=0)
         self.documents = []
 
     def load_text(self, text):
@@ -41,6 +43,7 @@ class LlamaWorker:
         pdf_documents = loader.load()
         self.documents.extend(pdf_documents)
 
+    # Summarize the documents using MapReduce
     def summarize(self):
         """
         Summarize the loaded documents.
@@ -52,26 +55,33 @@ class LlamaWorker:
             return "No documents to summarize."
 
         # Split documents into manageable chunks
-        text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
+        text_splitter = RecursiveCharacterTextSplitter(chunk_size=800, chunk_overlap=100)
         docs = text_splitter.split_documents(self.documents)
 
-        # Define the summarization prompt
-        prompt = ChatPromptTemplate.from_messages([
-            SystemMessage(content="You are a professional summarization assistant."),
-            HumanMessage(content="Please summarize the following content:\n\n{text}")
-        ])
+        # map_prompt = ChatPromptTemplate.from_template(
+        #     # SystemMessage(content="You are a professional summarization assistant."),
+        #     # HumanMessage(content="Please summarize the following content:\n\n {text}")
+        #     "You are a professional summarization assistant. Please summarize the following content:\n\n {text}"
+        # )
+        #
+        combine_prompt = ChatPromptTemplate.from_template(
+            "You are the reduce phase of a Map-Reduce summarization process. Please summarize the summaries from the map phase's output:\n\n{text} \n\n Please just give me a comprehesive summary without any other extra words."
+        )
 
-        # Create an LLMChain
-        chain = prompt | self.llm
+        collapse_prompt = ChatPromptTemplate.from_template(
+             "You are the collapse phase of a Map-Reduce summarization process. Please compress the map phase's output, making it shorter than 1000 tokens, if it's already within 1000 tokens do nothing:\n\n{text}"
+        )
 
-        summaries = []
-        for doc in docs:
-            summary = chain.invoke({"text": doc.page_content})
-            summaries.append(summary)
+        summary_chain = load_summarize_chain(
+            self.llm,
+            chain_type="map_reduce",
+            # verbose=True,
+            collapse_prompt=collapse_prompt,
+            combine_prompt=combine_prompt
+        )
 
-        # Combine all summaries
-        final_summary = "\n".join(summaries)
-        return final_summary
+        output_summary = summary_chain.invoke(input={"input_documents": docs})
+        return output_summary["output_text"]
 
     def extract_key_info(self):
         """
@@ -87,14 +97,10 @@ class LlamaWorker:
         text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
         docs = text_splitter.split_documents(self.documents)
 
-        # Define the key information extraction prompt
-        prompt = ChatPromptTemplate.from_messages([
-            SystemMessage(content="You are an information extraction expert."),
-            HumanMessage(content=(
-                "Please extract key information, knowledge points, key tasks, and time points from the following content:\n\n{text}\n\n"
-                "Please list them in an organized manner."
-            ))
-        ])
+
+        prompt = ChatPromptTemplate.from_template(
+            "You are an information extraction expert. Please extract key information, knowledge points, key tasks, and time points from the following content:\n\n {text}\n\nPlease list them in an organized manner."
+        )
 
         # Create an LLMChain
         chain = prompt | self.llm
@@ -135,7 +141,7 @@ if __name__ == '__main__':
     with open(os.path.join(PROJECT_BASE_PATH, "data", "output", "output_text.txt"), "r") as f:
         text_content = f.read()
     llama_worker.load_text(text_content)
-    print(llama_worker.documents)
+    # print(llama_worker.documents)
 
     # Load a PDF document
     # pdf_path = "sample.pdf"
@@ -147,6 +153,6 @@ if __name__ == '__main__':
     print(summary)
 
     # Extract key information from the documents
-    key_info = llama_worker.extract_key_info()
-    print("\nExtracted key information:")
-    print(key_info)
+    # key_info = llama_worker.extract_key_info()
+    # print("\nExtracted key information:")
+    # print(key_info)
