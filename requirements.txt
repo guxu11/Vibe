@@ -14,5 +14,12 @@ matplotlib
 langchain
 langchain-ollama
 langchain-community
+langchain_chroma
 ollama
 transformers
+unstructured
+unstructured_inference
+unstructured_pytesseract
+pdfminer.six
+pi_heif
+chromadb
