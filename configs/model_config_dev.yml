@@ -1,0 +1,22 @@
+ollama_hosts:
+  llama3.2:
+    - 1b
+    - 3b
+  gemma2:
+    - 2b
+  phi3.5:
+    - latest
+  nemotron-mini:
+    - latest
+  qwen2.5:
+    - 0.5b
+    - 1.5b
+    - 3b
+  codegemma:
+    - 2b
+  opencoder:
+    - 1.5b
+  smollm:
+    - 1.7b
+    - 135m
+    - 360m

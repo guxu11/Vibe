@@ -28,6 +28,7 @@ class LlamaWorker:
         self.model_name = model_name
         # Initialize the Ollama LLM
         self.llm = OllamaLLM(model=self.model_name, num_threads=8, temperature=0)
+        print("base_url: ", self.llm.base_url)
         self.documents = []
         self.supportive_documents = []
 
@@ -167,7 +168,7 @@ class LlamaWorker:
             Context is the background or setting where the content occurs, e.g., math class, team meeting, casual conversation, etc.
             Topic is the main topic or subject matter of the content.
             Key terms are important keywords or terms extracted from the content.
-            Summary must be a concise summary that captures the main ideas and key details. Your summary should be clear, coherent, and written in complete sentences. 
+            Summary must be a concise summary that captures the main ideas and key details. Your summary should be comprehesive, clear, coherent, and written in complete sentences. 
             
             The output should be formatted as a JSON instance that conforms to the JSON schema below. The output must only contain a json object without any additional text.
             
@@ -229,27 +230,70 @@ class ChunkSummary(BaseModel):
     )
 
 if __name__ == '__main__':
+    from .summary_measure import SummaryMeasurement
+
     # Example usage of the LlamaWork class
-    llama_worker = LlamaWorker()
+    model_list = [
+        "opencoder:1.5b", "codegemma:2b", "qwen2.5:3b", "qwen2.5:1.5b", "qwen2.5:0.5b",
+        "nemotron-mini:latest", "phi3.5:latest", "llama3.2:1b", "llama3.2:3b", "gemma2:2b"
+    ]
+    metric_collection = {}
+    summary_measurement = SummaryMeasurement()
+    documents_path = os.path.join(PROJECT_BASE_PATH, "data", "output")
+    document_list = os.listdir(documents_path)
+    num_documents = len(document_list)
+    for i, document in enumerate(document_list):
+        print(f"========{i+1} / {num_documents} is in process============")
+        print(document)
+        with open(os.path.join(documents_path, document), "r") as f:
+            text_content = f.read()
 
-    # Load text content
-    with open(os.path.join(PROJECT_BASE_PATH, "data", "output", "output.txt"), "r") as f:
-        text_content = f.read()
-    llama_worker.load_text(text_content)
-    # llama_worker.load_image(os.path.join(PROJECT_BASE_PATH, "data", "image", "img.png"))
-    # llama_worker.load_pdf(os.path.join(PROJECT_BASE_PATH, "data", "pdf", "meta_BQ_preparation.pdf"))
-    # print(llama_worker.documents)
+        summaries = {}
+        for model in model_list:
+            print(f"======== {model} is running ... ========")
+            llama_worker = LlamaWorker(model)
 
-    # Load a PDF document
-    # pdf_path = "sample.pdf"
-    # llama_work.load_pdf(pdf_path)
+            # Load text content
+            llama_worker.load_text(text_content)
+        # llama_worker.load_image(os.path.join(PROJECT_BASE_PATH, "data", "image", "img.png"))
+        # llama_worker.load_pdf(os.path.join(PROJECT_BASE_PATH, "data", "pdf", "meta_BQ_preparation.pdf"))
+        # print(llama_worker.documents)
 
-    # Summarize the loaded content
-    summary = llama_worker.summarize_with_my_map_reduce()
-    print("Summarized content:")
-    print(summary)
+        # Load a PDF document
+        # pdf_path = "sample.pdf"
+        # llama_work.load_pdf(pdf_path)
+        # Summarize the loaded content
+            try:
+                output = llama_worker.summarize_with_my_map_reduce()
+                summary = output["summary"]
+                summaries[model] = summary
+            except Exception as e:
+                print(e)
+                summaries[model] = "No summary"
 
-    # Extract key information from the documents
-    # key_info = llama_worker.extract_key_info()
-    # print("\nExtracted key information:")
-    # print(key_info)
+        measurements = summary_measurement.measure(summaries, text_content)
+        if not metric_collection:
+            metric_collection.update(measurements)
+        else:
+            for model, metrics in measurements.items():
+                for m, point in metrics.items():
+                    metric_collection[model][m] += point
+
+
+    for model, metrics in metric_collection.items():
+        for m in metrics:
+            metrics[m] = round(metrics[m] / num_documents, 2)
+
+    print(metric_collection)
+    summary_measurement.draw_plot(metric_collection)
+
+    res = {'opencoder:1.5b': {'Relevance': 1.0, 'Coherence': 1.0, 'Consistency': 1.0, 'Fluency': 1.0},
+     'codegemma:2b': {'Relevance': 1.0, 'Coherence': 1.0, 'Consistency': 1.0, 'Fluency': 1.0},
+     'qwen2.5:3b': {'Relevance': 3.62, 'Coherence': 3.88, 'Consistency': 3.38, 'Fluency': 3.0},
+     'qwen2.5:1.5b': {'Relevance': 3.5, 'Coherence': 3.88, 'Consistency': 3.88, 'Fluency': 2.88},
+     'qwen2.5:0.5b': {'Relevance': 3.12, 'Coherence': 3.25, 'Consistency': 3.75, 'Fluency': 3.0},
+     'nemotron-mini:latest': {'Relevance': 3.0, 'Coherence': 3.25, 'Consistency': 4.0, 'Fluency': 3.0},
+     'phi3.5:latest': {'Relevance': 4.25, 'Coherence': 4.38, 'Consistency': 4.12, 'Fluency': 2.88},
+     'llama3.2:1b': {'Relevance': 2.62, 'Coherence': 2.62, 'Consistency': 3.25, 'Fluency': 2.5},
+     'llama3.2:3b': {'Relevance': 3.75, 'Coherence': 3.75, 'Consistency': 3.88, 'Fluency': 3.0},
+     'gemma2:2b': {'Relevance': 4.5, 'Coherence': 4.62, 'Consistency': 4.62, 'Fluency': 3.0}}
