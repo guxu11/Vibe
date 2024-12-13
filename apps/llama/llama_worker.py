@@ -15,8 +15,6 @@ from langchain.chains.summarize import load_summarize_chain
 from langchain_core.output_parsers import JsonOutputParser
 
 
-import textwrap
-
 class LlamaWorker:
     def __init__(self, model_name="llama3.2"):
         """
@@ -28,7 +26,6 @@ class LlamaWorker:
         self.model_name = model_name
         # Initialize the Ollama LLM
         self.llm = OllamaLLM(model=self.model_name, num_threads=8, temperature=0)
-        print("base_url: ", self.llm.base_url)
         self.documents = []
         self.supportive_documents = []
 
@@ -162,17 +159,19 @@ class LlamaWorker:
         # combine_parser = JsonOutputParser(pydantic_object=Summary)
         combine_parser = JsonOutputParser()
         combine_prompt = PromptTemplate(
-            template = """You have a list of summaries which are extracted from ordered document chunks. Please combine and summarize them into a single summary:\n\n{text}
-            
-            You need to get the context, topic, key terms, and summary from the extracted key information.
-            Context is the background or setting where the content occurs, e.g., math class, team meeting, casual conversation, etc.
-            Topic is the main topic or subject matter of the content.
-            Key terms are important keywords or terms extracted from the content.
-            Summary must be a concise summary that captures the main ideas and key details. Your summary should be comprehesive, clear, coherent, and written in complete sentences. 
-            
-            The output should be formatted as a JSON instance that conforms to the JSON schema below. The output must only contain a json object without any additional text.
-            
-            Only give me the whole json object without any other extra words.
+            template="""You have a list of summaries extracted from ordered document chunks. These summaries are parts of a larger coherent document. Your task is to combine these summaries into one comprehensive summary.
+
+            Here is the input summaries:
+            \n\n{text}
+
+            You need to:
+            1. Identify the context as a concise descriptor of the setting. Avoid speculative phrases like "this content is likely from".
+            2. Determine the topic as a short phrase that clearly summarizes the subject matter.
+            3. Extract the key terms, which are significant keywords or terms central to the content.
+            4. Create a combined summary by merging the input summaries into one. The summary must be comprehensive, clear, coherent, and written in complete sentences. Avoid redundancy while preserving all important information.
+
+            The output must be formatted as a JSON object that adheres to the schema below. Do not include any text outside the JSON object.
+
             {{
                 "context": "",
                 "topic": "",
@@ -180,8 +179,7 @@ class LlamaWorker:
                 "summary": ""
             }}
             """,
-            input_varialbes = ["text"],
-            # partial_variables = {"format_instructions": combine_parser.get_format_instructions()}
+            input_variables=["text"]
         )
 
         combine_chain = combine_prompt | self.llm | combine_parser
