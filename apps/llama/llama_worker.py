@@ -1,8 +1,4 @@
 import os.path
-from typing import List
-
-from pydantic import BaseModel, Field
-
 from .. import PROJECT_BASE_PATH
 
 from langchain_core.prompts import ChatPromptTemplate, PromptTemplate
@@ -48,8 +44,9 @@ class LlamaWorker:
         try:
             if not os.path.exists(pdf_path):
                 raise FileNotFoundError(f"PDF file not found at path: {pdf_path}")
-            loader = PyPDFLoader(pdf_path)
+            loader = PyPDFLoader(pdf_path, extract_images=True)
             pdf_documents = loader.load()
+            print("PDF documents: ", pdf_documents)
             self.documents.extend(pdf_documents)
         except Exception as e:
             print(f"Error loading PDF document: {e}")
@@ -66,51 +63,12 @@ class LlamaWorker:
                 raise FileNotFoundError(f"Image file not found at path: {image_path}")
             loader = UnstructuredImageLoader(image_path)
             data = loader.load()
-            print(data[0])
+            print("Image data: ", data)
             self.documents.extend(data)
         except Exception as e:
             print(f"Error loading image: {e}")
-    # Summarize the documents using MapReduce
+
     def summarize(self):
-        """
-        Summarize the loaded documents.
-
-        Returns:
-        - summary (str): The summarized content.
-        """
-        if not self.documents:
-            return "No documents to summarize."
-
-        # Split documents into manageable chunks
-        text_splitter = RecursiveCharacterTextSplitter(chunk_size=800, chunk_overlap=100)
-        docs = text_splitter.split_documents(self.documents)
-        print(docs)
-
-        parser = JsonOutputParser(pydantic_object=Summary)
-        combine_prompt = ChatPromptTemplate.from_template(
-            """You are the reduce phase of a Map-Reduce summarization process. 
-            Please summarize the summaries from the map phase's output:\n\n{text} \n\n 
-            Please just give me a comprehesive summary without any other extra words."""
-        )
-        #
-        collapse_prompt = ChatPromptTemplate.from_template(
-             "You are the collapse phase of a Map-Reduce summarization process. Please compress the map phase's output, making it shorter than 1000 tokens, if it's already within 1000 tokens do nothing:\n\n{text}"
-        )
-
-        summary_chain = load_summarize_chain(
-            self.llm,
-            chain_type="map_reduce",
-            # verbose=True,
-            collapse_prompt=collapse_prompt,
-            combine_prompt=combine_prompt
-        )
-
-        summary_chain = summary_chain | parser
-
-        output_summary = summary_chain.invoke(input={"input_documents": docs})
-        return output_summary["output_text"]
-
-    def summarize_with_my_map_reduce(self):
         """
         Extract key information, knowledge points, key tasks, and time points from the documents.
 
@@ -186,8 +144,6 @@ class LlamaWorker:
         combined_summary = combine_chain.invoke({"text": final_key_info})
         return combined_summary
 
-    # def supportive_document(self):
-
 
     # Placeholder methods for future integration with tarily and ChromaDB
     def set_vector_store(self, vector_store):
@@ -208,24 +164,6 @@ class LlamaWorker:
         """
         self.retriever = retriever
 
-class Summary(BaseModel):
-    context: str = Field(
-        description="The background or setting where the content occurs, e.g., math class, team meeting, casual conversation, etc."
-    )
-    topic: str = Field(
-        description="The main topic or subject matter of the content."
-    )
-    key_terms: List[str] = Field(
-        description="Important keywords or terms extracted from the content."
-    )
-    summary: str = Field(
-        description="A detailed summary of the content."
-    )
-
-class ChunkSummary(BaseModel):
-    summary: str = Field(
-        description="The summary of the chunk."
-    )
 
 if __name__ == '__main__':
     from .summary_measure import SummaryMeasurement

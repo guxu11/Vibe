@@ -7,4 +7,4 @@ class TextSummaryService:
 
     def summarize_text(self, text):
         self.worker.load_text(text)
-        return self.worker.summarize_with_my_map_reduce()
+        return self.worker.summarize()

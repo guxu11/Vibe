@@ -4,10 +4,6 @@ ollama_hosts:
     - 3b
   gemma2:
     - 2b
-  phi3.5:
-    - latest
-  nemotron-mini:
-    - latest
   qwen2.5:
     - 0.5b
     - 1.5b
@@ -20,3 +16,19 @@ ollama_hosts:
     - 1.7b
     - 135m
     - 360m
+  deepseek-r1:
+    - 1.5b
+  tinyllama:
+    - 1.1b
+  tinydolphin:
+    - 1.1b
+  phi:
+    - 2.7b
+  orca-mini:
+    - 3b
+  hermes3:
+    - 3b
+  moondream:
+    - 1.8b
+  stablelm-zephyr:
+    - 3b
